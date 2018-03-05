@@ -13,7 +13,7 @@
 
 
 #define NO_ROCKS 200
-#define NO_ENEMY 10
+#define NO_ENEMY 100
 
 #define CINEMA_HEIGHT 30.0f
 #define TOWER_X 20.0f
@@ -21,11 +21,9 @@
 
 using namespace std;
 
-
-
 vector<Prism> rocks;
+vector<Enemy> enemies;
 Boat boat;
-Enemy enemy;
 Sea sea;
 Cube tower;
 
@@ -58,7 +56,7 @@ void draw() {
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
-		camera_rotation_angle = -boat.rotation + 95;
+		camera_rotation_angle = -boat.rotation.y + 95;
 
 
 		eye_x = target_x + 5*cos(camera_rotation_angle*M_PI/180.0f);
@@ -124,7 +122,7 @@ void draw() {
 	sea.draw(VP);
 	if (tower.visible) tower.draw(VP);
 	for(auto rock: rocks) rock.draw(VP);
-	// enemy.draw(VP);
+	for(auto enemy: enemies) enemy.draw(VP);
 	boat.draw(VP);
 
 }
@@ -160,8 +158,8 @@ void tick_input(GLFWwindow *window) {
 	boat.speed.x = boat.speed.z;
 
 
-	if(a) 		boat.rotation += Y_PAN;
-	else if(d) 	boat.rotation -= Y_PAN;
+	if(a) 		boat.rotation.y += Y_PAN;
+	else if(d) 	boat.rotation.y -= Y_PAN;
 
 	if(v) {
 		current_view++;
@@ -187,7 +185,7 @@ void tick_input(GLFWwindow *window) {
 		sphere_hold = false;
 		cur_sphere.speed.z = 0.3f - boat.speed.z;
 		cur_sphere.speed.x = 0.05f;
-		cur_sphere.rotation = -boat.rotation;
+		cur_sphere.rotation = -boat.rotation.y;
 		boat.shot.push_back(cur_sphere);
 		if(boat.weapons.size()) boat.weapons.back().visible = true;
 	}
@@ -203,7 +201,7 @@ void tick_elements() {
 
 	sea.tick();
 	boat.tick();
-	// enemy.tick(boat.position.x, boat.position.z);
+	for(auto enemy: enemies) enemy.tick(boat.position.x, boat.position.z);
 
 	if(boat.weapons.size()) {
 		Sphere cur_sphere = boat.weapons.back();
@@ -237,21 +235,35 @@ void collision_function(){
 /* Initialize the OpenGL rendering properties */
 /* Add all the models to be created here */
 void initGL(GLFWwindow *window, int width, int height) {
-	/* Objects should be created before any other gl function and shaders */
-	// Create the models
 
+	/* Objects should be created before any other gl function and shaders */
+
+	// Create the models
 	boat    	= Boat(0, 0, COLOR_ORANGE);
-	sea        	= Sea(0, 0, {0, 30, 206});
-	// enemy 		= Enemy(-10.0f, 2.5f, 10.0f, 10.0f, 10.0f, RAND_COLOR);
-	tower = Cube(TOWER_X, CINEMA_HEIGHT / 2.0f, TOWER_Z, 5.0f, CINEMA_HEIGHT, 5.0f, RAND_COLOR);
-	for(int i = 0; i < NO_ROCKS; i++)
-		rocks.push_back(Prism(
+	sea        	= Sea(0, 0, {119, 214, 255});
+	tower = Cube(TOWER_X, CINEMA_HEIGHT / 2.0f, TOWER_Z, 5.0f, CINEMA_HEIGHT, 5.0f, {114, 39, 26});
+	for(int i = 0; i < NO_ROCKS; i++) {
+		Prism cur_prism = Prism(
 			((rand() % 2 )? -1 : 1) * rand() % 200,
 			((rand() % 2 )? -1 : 1) * rand() % 200,
-			0.4f + 0.3 * (rand() % 4),
+			0.4f * (1 + (rand() % 4)),
 			0.3f + (rand() % 4),
-			0.4f + 0.3 * (rand() % 4),
-			{102, 102, 102}));
+			0.4f * (1 + (rand() % 4)),
+			{102, 102, 102});
+		cur_prism.rotation.x = ((rand() % 2)? -1 : 1) * (rand() % 47);
+		cur_prism.rotation.z = ((rand() % 2)? -1 : 1) * (rand() % 47);
+		rocks.push_back(cur_prism);
+	}
+	for(int i = 0; i < NO_ENEMY; i++) {
+		enemies.push_back(Enemy(
+			((rand() % 2 )? -1 : 1) * rand() % 200,
+			0.0f,
+			((rand() % 2 )? -1 : 1) * rand() % 200,
+			0.8f * (1 + (rand() % 4)),
+			{112, 12, 178}));
+	}
+
+
 
 	// Create and compile our GLSL program from the shaders
 	programID = LoadShaders("Sample_GL.vert", "Sample_GL.frag");
@@ -292,6 +304,10 @@ int main(int argc, char **argv) {
 			// 60 fps
 			// OpenGL Draw commands
 
+			draw();
+			// Swap Frame Buffer in double buffering
+			glfwSwapBuffers(window);
+
 			// All elements update
 			tick_elements();
 
@@ -300,10 +316,6 @@ int main(int argc, char **argv) {
 
 			// Take input from user
 			tick_input(window);
-
-			draw();
-			// Swap Frame Buffer in double buffering
-			glfwSwapBuffers(window);
 
 			reshapeWindow (window, width, height);
 
