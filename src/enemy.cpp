@@ -12,15 +12,47 @@
 Enemy::Enemy(float x, float y, float z, float width, color_t color) {
 	this->set_position(x, SEA_OFFSET + y, z);
 	this->set_speed(ENEMY_SPEED, 0, ENEMY_SPEED);
-	this->set_dimensions(width, width, width);
 	this->set_rotation(0, 0, 0);
+	this->set_dimensions(width);
 	this->roll_rate = ROLL_RATE;
 	this->color = color;
+}
+
+void Enemy::draw(glm::mat4 VP) {
+	Matrices.model = glm::mat4(1.0f);
+	glm::mat4 translate = glm::translate (this->position);
+	glm::mat4 rotate_y    = glm::rotate((float) (this->rotation.y * M_PI / 180.0f), glm::vec3(0, 1, 0));
+	glm::mat4 rotate_z    = glm::rotate((float) (this->rotation.z * M_PI / 180.0f), glm::vec3(0, 0, 1));
+	glm::mat4 rotate_x    = glm::rotate((float) (this->rotation.x * M_PI / 180.0f), glm::vec3(1, 0, 0));
+	Matrices.model *= (translate * rotate_y * rotate_z * rotate_x);
+	glm::mat4 MVP = VP * Matrices.model;
+	glUniformMatrix4fv(Matrices.MatrixID, 1, GL_FALSE, &MVP[0][0]);
+	body.draw(MVP);
+	for(auto spike: spikes) spike.draw(MVP);
+}
+
+void Enemy::set_position(float x, float y, float z) {
+	this->position = glm::vec3(x, y, z);
+}
+
+void Enemy::set_speed(float x_speed, float y_speed, float z_speed) {
+	this->speed = glm::vec3(x_speed, y_speed, z_speed);
+}
+
+void Enemy::set_rotation(float x_rot, float y_rot, float z_rot) {
+	this->rotation = glm::vec3(x_rot, y_rot, z_rot);
+}
+
+void Enemy::set_dimensions(float width) {
+
+	this->size = glm::vec3(width, width, width);
 
 	this->body = Cube(0.0f, 0.0f, 0.0f, width, width / 2.0f, width, this->color);
 
+	spikes.clear();
 	// spikes
-	color_t spike_color = {255, 144, 0};
+	color_t smart_color = {255, 246, 0}, normal_color = {255, 144, 0};
+	color_t spike_color = (this->is_smart)?  smart_color : normal_color;
 
 	// top spike
 	Prism spike_top = Prism(0.0f, 0.0f, width / 2.0f, 0.6 * width, 0.6 * width, spike_color);
@@ -52,35 +84,6 @@ Enemy::Enemy(float x, float y, float z, float width, color_t color) {
 
 }
 
-void Enemy::draw(glm::mat4 VP) {
-	Matrices.model = glm::mat4(1.0f);
-	glm::mat4 translate = glm::translate (this->position);
-	glm::mat4 rotate_y    = glm::rotate((float) (this->rotation.y * M_PI / 180.0f), glm::vec3(0, 1, 0));
-	glm::mat4 rotate_z    = glm::rotate((float) (this->rotation.z * M_PI / 180.0f), glm::vec3(0, 0, 1));
-	glm::mat4 rotate_x    = glm::rotate((float) (this->rotation.x * M_PI / 180.0f), glm::vec3(1, 0, 0));
-	Matrices.model *= (translate * rotate_y * rotate_z * rotate_x);
-	glm::mat4 MVP = VP * Matrices.model;
-	glUniformMatrix4fv(Matrices.MatrixID, 1, GL_FALSE, &MVP[0][0]);
-	body.draw(MVP);
-	for(auto spike: spikes) spike.draw(MVP);
-}
-
-void Enemy::set_position(float x, float y, float z) {
-	this->position = glm::vec3(x, y, z);
-}
-
-void Enemy::set_speed(float x_speed, float y_speed, float z_speed) {
-	this->speed = glm::vec3(x_speed, y_speed, z_speed);
-}
-
-void Enemy::set_rotation(float x_rot, float y_rot, float z_rot) {
-	this->rotation = glm::vec3(x_rot, y_rot, z_rot);
-}
-
-void Enemy::set_dimensions(float width, float height, float depth) {
-	this->size = glm::vec3(width, height, depth);
-}
-
 void Enemy::tick(float x, float z) {
 
 	// change the basic speed
@@ -99,11 +102,11 @@ void Enemy::tick(float x, float z) {
 			this->roll_rate *= -1;
 		}
 
-		if(abs(this->position.x - x) < 5.0f) this->speed.x += ((this->position.x > x)? 1 : -1) * 0.1f * ENEMY_SPEED;
-		else if(abs(this->position.x - x) > 15.0f) this->speed.x += ((this->position.x > x)? -1 : 1) * 0.01f * ENEMY_SPEED;
+		if(abs(this->position.x - x) < 5.0f) this->speed.x -= 0.1f * ENEMY_SPEED;
+		else if(abs(this->position.x - x) > 15.0f) this->speed.x += 0.05f * ENEMY_SPEED;
 
-		if(abs(this->position.z - z) < 5.0) this->speed.z += ((this->position.z > z)? 1 : -1) * 0.1f * ENEMY_SPEED;
-		else if(abs(this->position.z - z) > 15.0f) this->speed.z += ((this->position.z > z)? -1 : 1) * 0.01f * ENEMY_SPEED;
+		if(abs(this->position.z - z) < 5.0) this->speed.z -= 0.1f * ENEMY_SPEED;
+		else if(abs(this->position.z - z) > 15.0f) this->speed.z += 0.05f * ENEMY_SPEED;
 	}
 
 }

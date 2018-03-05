@@ -19,7 +19,7 @@ public:
     vector<Cube> walls;
     vector<Sphere> weapons, shot;
     color_t color;
-    float score = 0, lives = BOAT_LIFE, roll_rate = 0;
+    float score = 0, life = BOAT_LIFE, roll_rate = 0;
     bool is_jumping = false;
 
     void draw(glm::mat4 VP);

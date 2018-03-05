@@ -14,7 +14,7 @@
 #define BOAT_WIDTH 4.0f
 #define BOAT_LENGTH 6.0f
 
-#define BOAT_MAX_SPEED 3.0f
+#define BOAT_MAX_SPEED 2.0f
 #define ROLL_RATE 0.08f
 
 #define GRAVITY 0.004f
@@ -147,8 +147,6 @@ void Boat::tick() {
 
     if(this->speed.x > BOAT_MAX_SPEED)
         this->speed.x = BOAT_MAX_SPEED;
-    if(this->speed.y > BOAT_MAX_SPEED)
-        this->speed.y = BOAT_MAX_SPEED;
     if(this->speed.z > BOAT_MAX_SPEED)
         this->speed.z = BOAT_MAX_SPEED;
 }

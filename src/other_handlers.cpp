@@ -20,7 +20,6 @@ void error_callback(int error, const char *description) {
 }
 
 void quit(GLFWwindow *window) {
-    printf("Boat health:%d Score:%d\n",boat_health,score);
     glfwDestroyWindow(window);
     glfwTerminate();
     exit(EXIT_SUCCESS);

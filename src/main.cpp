@@ -7,17 +7,19 @@
 #include "enemy.h"
 
 #define RAND_COLOR { rand() % 255, rand() % 255, rand() % 255 }
+#define LEVEL 2
+
 #define Z_ACCLR 0.002f // speed increase
 #define X_ACCLR 0.002f // speed increase
 #define Y_PAN 5 // degrees
-
+#define FOLLOW_DISTANCE 6.0f
 
 #define NO_ROCKS 200
-#define NO_ENEMY 100
-
+#define NO_ENEMY 10
 #define CINEMA_HEIGHT 30.0f
 #define TOWER_X 20.0f
 #define TOWER_Z 20.0f
+#define SEA_OFFSET 0.4f
 
 using namespace std;
 
@@ -52,41 +54,30 @@ void draw() {
 
 
 	// All Camera Positions defined here.
-	if (camera_follower_view == true){
+	if (camera_top_view == true) {
+		target_x = boat.position.x;
+		target_y = boat.position.y;
+		target_z = boat.position.z;
+		eye_x = target_x + FOLLOW_DISTANCE * cos(camera_rotation_angle * M_PI / 180.0f);
+		eye_y = target_y + CINEMA_HEIGHT / 2.0f;
+		eye_z = target_z + FOLLOW_DISTANCE * sin(camera_rotation_angle * M_PI / 180.0f);
+	}
+	else if (camera_follower_view == true){
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
 		camera_rotation_angle = -boat.rotation.y + 95;
-
-
-		eye_x = target_x + 5*cos(camera_rotation_angle*M_PI/180.0f);
-		eye_y = target_y + 5;
-		eye_z = target_z + 5*sin(camera_rotation_angle*M_PI/180.0f);
-
+		eye_x = target_x + FOLLOW_DISTANCE * cos(camera_rotation_angle * M_PI / 180.0f);
+		eye_y = target_y + FOLLOW_DISTANCE;
+		eye_z = target_z + FOLLOW_DISTANCE * sin(camera_rotation_angle * M_PI / 180.0f);
 	}
-
-	else if (camera_top_view == true){
-		target_x = boat.position.x;
-		target_y = boat.position.y;
-		target_z = boat.position.z;
-
-
-		eye_x = target_x + 5*cos(camera_rotation_angle*M_PI/180.0f);
-		eye_y = target_y + 25;
-		eye_z = target_z + 5*sin(camera_rotation_angle*M_PI/180.0f);
-
-	}
-
-
 	else if (camera_cinema_view == true) {
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
-
 		eye_x = TOWER_X;
 		eye_y = CINEMA_HEIGHT;
 		eye_z = TOWER_Z;
-
 	}
 
 
@@ -124,6 +115,7 @@ void draw() {
 	for(auto rock: rocks) rock.draw(VP);
 	for(auto enemy: enemies) enemy.draw(VP);
 	boat.draw(VP);
+	if(boat.life < 100) { cout<<boat.life<<endl; boat.life = 10;}
 
 }
 
@@ -224,12 +216,93 @@ void tick_elements() {
 
 void collision_function(){
 
-	for(auto rock: rocks)
-		if(detect_collision(boat.bounding_box(), rock.bounding_box())) {
-			cout<<"Rock collided"<<rand()<<endl;
-			// rocks.erase(rock);
-		}
+	// collide with tower when normal view
+	if(tower.visible && detect_collision(boat.bounding_box(), tower.bounding_box()))
+		boat.speed.z *= -1.0f, boat.speed.x *= -1.0f;
 
+	// collision with rocks slightly reduces the life and respwans the rocks randomly
+	for(vector<Prism>::iterator rock = rocks.begin(); rock != rocks.end();)
+		if(detect_collision(boat.bounding_box(), rock->bounding_box())) {
+			cout<<"ROCK "<<rand()<<endl;
+
+			if (rand() % 6 < 4) {
+				Prism cur_prism = Prism(
+				((rand() % 2 )? -1 : 1) * rand() % 200,
+				((rand() % 2 )? -1 : 1) * rand() % 200,
+				0.4f * (1 + (rand() % 4)),
+				0.3f + (rand() % 4),
+				0.4f * (1 + (rand() % 4)),
+				{102, 102, 102});
+				cur_prism.rotation.x = ((rand() % 2)? -1 : 1) * (rand() % 47);
+				cur_prism.rotation.z = ((rand() % 2)? -1 : 1) * (rand() % 47);
+				rocks.push_back(cur_prism);
+			}
+
+			boat.life--;
+			rock = rocks.erase(rock);
+		}
+		else rock++;
+
+	// collision with enemies greatly reduces the life and respawns the enemies frequently
+	// once in a while it respawns a BOSS, someone who is smarter than the rest
+	for(vector<Enemy>::iterator enemy = enemies.begin(); enemy != enemies.end();)
+		if(detect_collision(boat.bounding_box(), enemy->bounding_box())) {
+			cout<<"ENEMY "<<rand()<<endl;
+
+			if(enemy->is_smart) { boat.life = 0; break; }
+
+			boat.score++;
+			boat.life -= 3;
+			enemy->life--;
+
+			if(boat.position.y > SEA_OFFSET) boat.speed.y *= 1.05f;
+			else if(fabs(boat.speed.z) > 0.3f || fabs(boat.speed.x) > 0.3f)
+				boat.speed.z *= -1.0f, boat.speed.x *= -1.0f;
+
+			// add random enemies
+			if(rand() % 2) {
+				Enemy cur_enemy = Enemy(
+				((rand() % 2 )? -1 : 1) * rand() % 200,
+				0.0f,
+				((rand() % 2 )? -1 : 1) * rand() % 200,
+				0.8f * (1 + (rand() % 4)),
+				{112, 12, 178});
+				// 1 in 10 respawns will be a smart enemy
+				if(1 + (rand() % 10) <= LEVEL) {
+					cur_enemy.is_smart = true;
+					cur_enemy.color = {25, 255, 0};
+					cur_enemy.set_dimensions(10.0f);
+					cur_enemy.life *= 10;
+				}
+				enemies.push_back(cur_enemy);
+			}
+			if(enemy->life <= 0) enemy = enemies.erase(enemy);
+			else enemy++;
+		}
+		else enemy++;
+
+
+	// collision of enemies with rocks leads to removal of the rock
+	// with respawn of the same elsewhere
+	for(auto &enemy: enemies)
+		for(vector<Prism>::iterator rock = rocks.begin(); rock != rocks.end();)
+			if(detect_collision(enemy.bounding_box(), rock->bounding_box())) {
+				if(!enemy.is_smart) enemy.life--;
+				rock = rocks.erase(rock);
+
+				Prism cur_prism = Prism(
+				((rand() % 2 )? -1 : 1) * rand() % 200,
+				((rand() % 2 )? -1 : 1) * rand() % 200,
+				0.4f * (1 + (rand() % 4)),
+				0.3f + (rand() % 4),
+				0.4f * (1 + (rand() % 4)),
+				{102, 102, 102});
+				cur_prism.rotation.x = ((rand() % 2)? -1 : 1) * (rand() % 47);
+				cur_prism.rotation.z = ((rand() % 2)? -1 : 1) * (rand() % 47);
+
+				rocks.push_back(cur_prism);
+			}
+			else rock++;
 }
 
 /* Initialize the OpenGL rendering properties */
@@ -314,6 +387,8 @@ int main(int argc, char **argv) {
 			// Collision Engine
 			collision_function();
 
+			if(boat.life <= 0 || enemies.size() == 0) break;
+
 			// Take input from user
 			tick_input(window);
 
@@ -329,7 +404,7 @@ int main(int argc, char **argv) {
 }
 
 bool detect_collision(bounding_box_t a, bounding_box_t b) {
-	return (abs(a.x - b.x) * 2 < (a.width + b.width)) &&
-		   (abs(a.y - b.y) * 2 < (a.height + b.height)) &&
-		   (abs(a.z - b.z) * 2 < (a.depth + b.depth));
+	return (1.75 * fabs(a.x - b.x) < (a.width + b.width)) &&
+		   (1.75 * fabs(a.y - b.y) < (a.height + b.height)) &&
+		   (1.75 * fabs(a.z - b.z) < (a.depth + b.depth));
 }

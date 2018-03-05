@@ -90,7 +90,6 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     else if(yoffset == -1)
         screen_zoom /= 1.1;
 
-
     reshapeWindow(window,1600,1600);
 
 }
