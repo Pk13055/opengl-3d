@@ -15,12 +15,12 @@ public:
     Boat() {}
     Boat(float x, float z, color_t color);
 
-    glm::vec3 position, speed, rotation;
+    glm::vec3 position, speed, rotation, size;
     vector<Cube> walls;
-    vector<Sphere> weapons, shot;
+    vector<Sphere> shots;
     color_t color;
     float score = 0, life = BOAT_LIFE, roll_rate = 0;
-    bool is_jumping = false;
+    bool is_jumping = false, draw_shot = true;
 
     void draw(glm::mat4 VP);
     void set_position(float x, float y, float z);

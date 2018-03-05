@@ -1,6 +1,7 @@
-#include "boat.h"
-#include "cube.h"
 #include "main.h"
+#include "cube.h"
+#include "sphere.h"
+#include "boat.h"
 
 
 #define RAND_COLOR { rand() % 255, rand() % 255, rand() % 255 }
@@ -27,10 +28,15 @@ Boat::Boat(float x, float z, color_t color) {
     this->color = color;
     this->roll_rate = ROLL_RATE;
 
+    /* SIZE PARAMS FOR EXT USE */
+    this->size.x = BOAT_WIDTH + 2 * BOAT_WALL_X_THICKNESS;
+    this->size.y = BOAT_WALL_Y_HEIGHT + BOAT_WALL_X_THICKNESS + MAST_HEIGHT;
+    this->size.z = BOAT_LENGTH;
+
+    // loading the shots
     for(int i = 0; i < WEAPON_COUNT; i++)
-        this->weapons.push_back(Sphere(0.0f, SEA_OFFSET, -BOAT_WALL_Z_LENGTH / 2.0f,
-            0.8f * (1 + (rand() % 3)), COLOR_RED));
-    weapons.back().visible = true;
+        shots.push_back(Sphere(0.0f, BOAT_WALL_Y_HEIGHT / 2.0f, - BOAT_LENGTH / 2.0f,
+        0.1f * (3 + rand() % 4), RAND_COLOR));
 
     /*  WALLS OF THE BOAT */
     color_t walls_color = RAND_COLOR;
@@ -103,10 +109,7 @@ void Boat::draw(glm::mat4 VP) {
     glm::mat4 MVP = VP * Matrices.model;
     glUniformMatrix4fv(Matrices.MatrixID, 1, GL_FALSE, &MVP[0][0]);
     for(auto wall: this->walls) wall.draw(MVP);
-    for(auto weapon: this->weapons)
-        if(weapon.visible) { weapon.draw(MVP); break; }
-    for(auto shoot: this->shot)
-        if(shoot.visible) shoot.draw(MVP);
+    if(this->shots.size() && this->draw_shot) this->shots.back().draw(MVP);
 }
 
 void Boat::set_position(float x, float y, float z = 0) {
@@ -144,6 +147,9 @@ void Boat::tick() {
         this->speed.y = 0;
         this->is_jumping = false;
     }
+
+    screen_center_x = this->position.x;
+    screen_center_z = this->position.z;
 
     if(this->speed.x > BOAT_MAX_SPEED)
         this->speed.x = BOAT_MAX_SPEED;
