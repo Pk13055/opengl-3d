@@ -2,7 +2,6 @@
 #include "timer.h"
 #include "sea.h"
 #include "boat.h"
-#include "objects.h"
 #include "prism.h"
 #include "cube.h"
 #include "enemy.h"
@@ -14,6 +13,11 @@
 
 
 #define NO_ROCKS 200
+#define NO_ENEMY 10
+
+#define CINEMA_HEIGHT 30.0f
+#define TOWER_X 20.0f
+#define TOWER_Z 20.0f
 
 using namespace std;
 
@@ -23,14 +27,19 @@ vector<Prism> rocks;
 Boat boat;
 Enemy enemy;
 Sea sea;
+Cube tower;
 
 int boat_health = 100, score = 0;
+int current_view = 0;
+// 0 -> camera_follower
+// 1 -> camera top view
+// 2 -> camera cinema view
+bool camera_follower_view = true, camera_top_view = false, camera_cinema_view = false,
+sphere_hold = true;
 float screen_zoom = 2.0, screen_center_x = 0, screen_center_y = 0, screen_center_z;
 float eye_x,eye_y,eye_z;
 float target_x, target_y, target_z;
 float camera_rotation_angle = 95.0;
-bool camera_follower = true, camera_top_view=false,
-sphere_hold = true;
 
 
 GLMatrices Matrices;
@@ -45,7 +54,7 @@ void draw() {
 
 
 	// All Camera Positions defined here.
-	if (camera_follower == true){
+	if (camera_follower_view == true){
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
@@ -67,6 +76,18 @@ void draw() {
 		eye_x = target_x + 5*cos(camera_rotation_angle*M_PI/180.0f);
 		eye_y = target_y + 25;
 		eye_z = target_z + 5*sin(camera_rotation_angle*M_PI/180.0f);
+
+	}
+
+
+	else if (camera_cinema_view == true) {
+		target_x = boat.position.x;
+		target_y = boat.position.y;
+		target_z = boat.position.z;
+
+		eye_x = TOWER_X;
+		eye_y = CINEMA_HEIGHT;
+		eye_z = TOWER_Z;
 
 	}
 
@@ -101,8 +122,9 @@ void draw() {
 
 	// Scene render
 	sea.draw(VP);
+	if (tower.visible) tower.draw(VP);
 	for(auto rock: rocks) rock.draw(VP);
-	enemy.draw(VP);
+	// enemy.draw(VP);
 	boat.draw(VP);
 
 }
@@ -125,8 +147,7 @@ void tick_input(GLFWwindow *window) {
 	int f   = glfwGetKey(window, GLFW_KEY_F);
 
 	// Camera Views
-	int t   = glfwGetKey(window, GLFW_KEY_T);
-	int u   = glfwGetKey(window, GLFW_KEY_U);
+	int v = glfwGetKey(window, GLFW_KEY_V);
 
 	if(left) camera_rotation_angle += 1;
 	else if(right) camera_rotation_angle -= 1;
@@ -142,8 +163,23 @@ void tick_input(GLFWwindow *window) {
 	if(a) 		boat.rotation += Y_PAN;
 	else if(d) 	boat.rotation -= Y_PAN;
 
-	if(t) 		camera_top_view = true, camera_follower = false;
-	else if(u)  camera_top_view = false, camera_follower = true;
+	if(v) {
+		current_view++;
+		current_view = current_view % 3;
+		tower.visible = true;
+		camera_follower_view = camera_top_view = camera_cinema_view = false;
+		switch(current_view) {
+			case 0: 	camera_follower_view	= true;
+						break;
+			case 1: 	camera_top_view 		= true;
+						break;
+			case 2: 	camera_cinema_view 		= true;
+						tower.visible = false;
+						break;
+			default: 	camera_follower_view 	= true;
+						break;
+		}
+	}
 
 	if(f && boat.weapons.size()){
 		Sphere cur_sphere = boat.weapons.back();
@@ -167,7 +203,7 @@ void tick_elements() {
 
 	sea.tick();
 	boat.tick();
-	enemy.tick(boat.position.x, boat.position.z);
+	// enemy.tick(boat.position.x, boat.position.z);
 
 	if(boat.weapons.size()) {
 		Sphere cur_sphere = boat.weapons.back();
@@ -190,39 +226,11 @@ void tick_elements() {
 
 void collision_function(){
 
-	// if(detect_collision(boat.bounding_box(),cur_sphere.bounding_box()))
-	//     printf("FireBall on the ship\n");
-	// else
-	//     printf("Fireball flying\n");
-
 	for(auto rock: rocks)
 		if(detect_collision(boat.bounding_box(), rock.bounding_box())) {
 			cout<<"Rock collided"<<rand()<<endl;
 			// rocks.erase(rock);
 		}
-	// Check Monster collision with fireball or boat
-
-	// vector <Prism> :: iterator it;
-	// for(it = monsters.prism.begin(); it < monsters.prism.end(); it++)
-	// {
-	// 	if(detect_collision(boat.bounding_box(),it->bounding_box()))
-	// 	{
-	// 		boat_health -= 10;
-	// 		score += 100;
-	// 		monsters.kill(it);
-	// 		printf("Monster Attack. Health:%d Score:%d\n",boat_health,score);
-	// 	 }
-
-	// }
-
-
-	// for(it = monsters.prism.begin(); it < monsters.prism.end(); it++)
-	// if(detect_collision(cur_sphere.bounding_box(),it->bounding_box()))
-	// 	{
-	// 		score += 100;
-	// 		printf("Fireball Hit Score:%d\n",score);
-	// 		monsters.kill(it);
-	// 	}
 
 }
 
@@ -234,7 +242,8 @@ void initGL(GLFWwindow *window, int width, int height) {
 
 	boat    	= Boat(0, 0, COLOR_ORANGE);
 	sea        	= Sea(0, 0, {0, 30, 206});
-	enemy 		= Enemy(-10.0f, 0.0f, 5.0f, 5.0f, 5.0f, RAND_COLOR);
+	// enemy 		= Enemy(-10.0f, 2.5f, 10.0f, 10.0f, 10.0f, RAND_COLOR);
+	tower = Cube(TOWER_X, CINEMA_HEIGHT / 2.0f, TOWER_Z, 5.0f, CINEMA_HEIGHT, 5.0f, RAND_COLOR);
 	for(int i = 0; i < NO_ROCKS; i++)
 		rocks.push_back(Prism(
 			((rand() % 2 )? -1 : 1) * rand() % 200,
@@ -282,10 +291,6 @@ int main(int argc, char **argv) {
 		if (t60.processTick()) {
 			// 60 fps
 			// OpenGL Draw commands
-
-			draw();
-			// Swap Frame Buffer in double buffering
-			glfwSwapBuffers(window);
 
 			// All elements update
 			tick_elements();
