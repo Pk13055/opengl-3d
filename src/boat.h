@@ -15,19 +15,23 @@ public:
     Boat() {}
     Boat(float x, float z, color_t color);
 
-    glm::vec3 position, speed;
+    glm::vec3 position, speed, rotation;
     vector<Cube> walls;
     vector<Sphere> weapons, shot;
     color_t color;
-    float rotation = 0, score = 0, lives = BOAT_LIFE;
+    float score = 0, lives = BOAT_LIFE, roll_rate = 0;
     bool is_jumping = false;
 
     void draw(glm::mat4 VP);
     void set_position(float x, float y, float z);
     void set_speed(float x_speed, float y_speed, float z_speed);
+    void set_rotation(float x_rot, float y_rot, float z_rot);
     void tick();
 
     bounding_box_t bounding_box();
+
+private:
+    VAO *object;
 };
 
 
