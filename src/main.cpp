@@ -201,7 +201,7 @@ void tick_elements() {
 
 	sea.tick();
 	boat.tick();
-	for(auto enemy: enemies) enemy.tick(boat.position.x, boat.position.z);
+	for(auto &enemy: enemies) enemy.tick(boat.position.x, boat.position.z);
 
 	if(boat.weapons.size()) {
 		Sphere cur_sphere = boat.weapons.back();

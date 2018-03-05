@@ -2,6 +2,9 @@
 #include "prism.h"
 #include "cube.h"
 
+#define DEFAULT_SMART 0
+#define DEFAULT_LIFE 1
+
 #ifndef ENEMY_H
 #define ENEMY_H
 
@@ -13,8 +16,10 @@ public:
     Enemy(float x, float y, float z, float width, color_t color);
 
     glm::vec3 position, speed, size, rotation;
-    bool visible = true;
+    bool visible = true, is_smart = DEFAULT_SMART, life = DEFAULT_LIFE;
+    float roll_rate = 0;
     color_t color;
+
     Cube body;
     vector<Prism> spikes;
 
