@@ -6,6 +6,7 @@
 #include "cube.h"
 #include "enemy.h"
 #include "sphere.h"
+#include "reward.h"
 
 #define RAND_COLOR { rand() % 255, rand() % 255, rand() % 255 }
 #define LEVEL 2
@@ -28,6 +29,7 @@ using namespace std;
 vector<Prism> rocks;
 vector<Enemy> enemies;
 vector<Sphere> balls;
+vector<Reward> rewards;
 Boat boat;
 Sea sea;
 Cube tower;
@@ -38,7 +40,7 @@ int current_view = 0;
 // 1 -> camera top view
 // 2 -> camera cinema view
 bool camera_follower_view = true, camera_top_view = false, camera_cinema_view = false,
-sphere_hold = false;
+sphere_hold = false, boost_allow = false;
 float screen_zoom = 2.0, screen_center_x = 0, screen_center_y = 0, screen_center_z = 0;
 float eye_x,eye_y,eye_z;
 float target_x, target_y, target_z;
@@ -117,6 +119,7 @@ void draw() {
 	if (tower.visible) tower.draw(VP);
 	for(auto rock: rocks) rock.draw(VP);
 	for(auto enemy: enemies) enemy.draw(VP);
+	for(auto &reward: rewards) reward.draw(VP);
 	boat.draw(VP);
 	for(auto ball: balls) ball.draw(VP);
 }
@@ -137,6 +140,7 @@ void tick_input(GLFWwindow *window) {
 	int space = glfwGetKey(window, GLFW_KEY_SPACE);
 	// Fireballs
 	int f   = glfwGetKey(window, GLFW_KEY_F);
+	int b   = glfwGetKey(window, GLFW_KEY_B);
 
 	// Camera Views
 	int v = glfwGetKey(window, GLFW_KEY_V);
@@ -149,8 +153,13 @@ void tick_input(GLFWwindow *window) {
 	else if (boat.speed.z < 0) 	boat.speed.z += Z_ACCLR;
 	else if (boat.speed.z > 0) 	boat.speed.z -= Z_ACCLR;
 	else 						boat.speed.z = 0;
-	boat.speed.x = boat.speed.z;
 
+	if(b && boost_allow) {
+		boat.speed.x *= 1.25f;
+		boat.speed.x += ((boat.speed.x < 0)? -1 : 1) * 1.5f;
+		boost_allow = false;
+	}
+	boat.speed.x = boat.speed.z;
 
 	if(a) 		boat.rotation.y += Y_PAN;
 	else if(d) 	boat.rotation.y -= Y_PAN;
@@ -190,7 +199,7 @@ void tick_input(GLFWwindow *window) {
 	if(space && boat.is_jumping == false) boat.is_jumping = true, boat.speed.y = 0.2f;
 }
 
-void tick_elements() {
+bool tick_elements() {
 
 	sea.tick();
 	boat.tick();
@@ -198,8 +207,26 @@ void tick_elements() {
 		if(cur_ball->tick())
 			cur_ball = balls.erase(cur_ball);
 		else cur_ball++;
+	for(auto reward: rewards) reward.tick();
 	for(auto &enemy: enemies) enemy.tick(boat.position.x, boat.position.z);
 	sea.set_position(boat.position.x, boat.position.z);
+
+	char mesg_display[512], final_mesg[128];
+    if(boat.life == 0 || enemies.size() == 0) {
+        sprintf(final_mesg, (!boat.life)? "Game Over!" : "Winner!");
+        sprintf(mesg_display, "3D LoZ v4.4 Status %s | life: %d | Score: %d",
+         final_mesg, boat.life, boat.score);
+        glfwSetWindowTitle(window, mesg_display);
+        cout<<final_mesg<<endl;
+        return true;
+    }
+    else {
+        sprintf(final_mesg, "%d enemies left", (int) enemies.size());
+        sprintf(mesg_display, "3D LoZ v3.4 Status %s | life: %d | Score: %d | Balls : %d",
+         final_mesg, boat.life, boat.score, (int) boat.shots.size());
+        glfwSetWindowTitle(window, mesg_display);
+        return false;
+    }
 }
 
 
@@ -209,10 +236,36 @@ void collision_function(){
 	if(tower.visible && detect_collision(boat.bounding_box(), tower.bounding_box()))
 		boat.speed.z *= -1.0f, boat.speed.x *= -1.0f;
 
+
+	// collision with a reward
+	for(vector<Reward>::iterator reward = rewards.begin(); reward != rewards.end();) {
+		if(detect_collision(boat.bounding_box(), reward->bounding_box())) {
+			cout<<"BOAT <-> REWARD"<<endl;
+			boost_allow = true;
+			boat.life += 10;
+			boat.score += 50;
+			reward = rewards.erase(reward);
+			continue;
+		}
+		bool not_changed = true;
+		for(auto &enemy: enemies)
+			if(detect_collision(enemy.bounding_box(), reward->bounding_box())) {
+				cout<<"ENEMY <-> REWARD"<<endl;
+				if(enemy.is_smart) enemy.life += 10;
+				else enemy.life++;
+				reward = rewards.erase(reward);
+				not_changed = false;
+				break;
+			}
+		if(not_changed) reward++;
+	}
+
+
 	// collision between balls and rocks
 	for(auto &ball: balls)
 		for(vector<Prism>::iterator spike = rocks.begin(); spike != rocks.end();)
 			if(detect_collision(ball.bounding_box(), spike->bounding_box())) {
+				cout<<"BALL <-> SPIKE"<<endl;
 				ball.speed.x = ball.speed.z = 0.0f;
 				ball.speed.y *= -1.4f;
 				spike = rocks.erase(spike);
@@ -223,11 +276,18 @@ void collision_function(){
 	for(auto &ball: balls)
 		for(vector<Enemy>::iterator enemy = enemies.begin(); enemy != enemies.end();)
 			if(detect_collision(ball.bounding_box(), enemy->bounding_box())) {
-				if(enemy->is_smart) boat.score += 100;
-				enemy->life-= 5;
+				cout<<"BALL <-> ENEMY"<<endl;
+				if(enemy->is_smart) boat.score += 100, enemy->life-= 3;
+				else boat.score += 50, enemy->life-= 5;
 				ball.speed.x = ball.speed.z = 0.0f;
 				ball.speed.y *= -1.5f;
-				enemy = enemies.erase(enemy);
+				// add reward
+				if(enemy->life == 0) {
+					enemy = enemies.erase(enemy);
+					if(1 + (rand() % 10) <= (10 - LEVEL))
+						rewards.push_back(Reward(enemy->position.x + 5.0f, enemy->position.z + 5.0f));
+				}
+				else enemy++;
 			}
 			else enemy++;
 
@@ -298,6 +358,7 @@ void collision_function(){
 	for(auto &enemy: enemies)
 		for(vector<Prism>::iterator rock = rocks.begin(); rock != rocks.end();)
 			if(detect_collision(enemy.bounding_box(), rock->bounding_box())) {
+				cout<<"ENEMY <-> ROCK"<<endl;
 				if(!enemy.is_smart) enemy.life--;
 				rock = rocks.erase(rock);
 
@@ -327,6 +388,11 @@ void initGL(GLFWwindow *window, int width, int height) {
 	boat    	= Boat(0.0f, 0.0f, COLOR_ORANGE);
 	sea        	= Sea(0.0f, 0.0f, {119, 214, 255});
 	tower = Cube(TOWER_X, CINEMA_HEIGHT / 2.0f, TOWER_Z, 5.0f, CINEMA_HEIGHT, 5.0f, {114, 39, 26});
+	for(int i = 0; i < (10 - LEVEL); i++)
+		rewards.push_back(Reward(
+			((rand() % 2 )? -1 : 1) * rand() % 200,
+			((rand() % 2 )? -1 : 1) * rand() % 200
+		));
 
 	// rocks
 	for(int i = 0; i < NO_ROCKS; i++) {
@@ -385,7 +451,7 @@ int main(int argc, char **argv) {
 	initGL (window, width, height);
 
 	/* Draw in loop */
-	int timer = 0;
+	long long int timer = 0;
 	while (!glfwWindowShouldClose(window)) {
 		// Process timers
 
@@ -398,22 +464,27 @@ int main(int argc, char **argv) {
 			glfwSwapBuffers(window);
 
 			// All elements update
-			tick_elements();
+			bool status = tick_elements();
 
 			// Collision Engine
 			collision_function();
 
-			if(boat.life <= 0 || enemies.size() == 0) break;
-			if(timer % 51 == 0) {
-				sphere_hold = false;
-				boat.draw_shot = true;
+			if(status) break;
+
+			if(timer % 61 == 0) sphere_hold = false, boat.draw_shot = true;
+			else if(timer % 183 == 0) {
+				boost_allow = true;
+				rewards.push_back(Reward(
+					((rand() % 2 )? -1 : 1) * rand() % 200,
+					((rand() % 2 )? -1 : 1) * rand() % 200
+				));
 			}
 
 			// Take input from user
 			tick_input(window);
 
 			reshapeWindow (window, width, height);
-			(++timer) %= 61;
+			(++timer) %= 1893;
 
 		}
 
