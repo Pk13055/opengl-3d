@@ -16,7 +16,7 @@ public:
     Enemy(float x, float y, float z, float width, color_t color);
 
     glm::vec3 position, speed, size, rotation;
-    bool visible = true, is_smart = DEFAULT_SMART;
+    bool visible = true, is_smart = DEFAULT_SMART, is_jumping = false;
     int life = DEFAULT_LIFE;
     float roll_rate = 0;
     color_t color;

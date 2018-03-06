@@ -33,10 +33,8 @@ Boat::Boat(float x, float z, color_t color) {
     this->size.y = BOAT_WALL_Y_HEIGHT + BOAT_WALL_X_THICKNESS + MAST_HEIGHT;
     this->size.z = BOAT_LENGTH;
 
-    // loading the shots
-    for(int i = 0; i < WEAPON_COUNT; i++)
-        shots.push_back(Sphere(0.0f, BOAT_WALL_Y_HEIGHT / 2.0f, - BOAT_LENGTH / 2.0f,
-        0.1f * (3 + rand() % 4), RAND_COLOR));
+    // loading the initial shots
+    this->load_ammo(WEAPON_COUNT);
 
     /*  WALLS OF THE BOAT */
     color_t walls_color = RAND_COLOR;
@@ -110,6 +108,12 @@ void Boat::draw(glm::mat4 VP) {
     glUniformMatrix4fv(Matrices.MatrixID, 1, GL_FALSE, &MVP[0][0]);
     for(auto wall: this->walls) wall.draw(MVP);
     if(this->shots.size() && this->draw_shot) this->shots.back().draw(MVP);
+}
+
+void Boat::load_ammo(int count = 1) {
+    for(int i = 0; i < count; i++)
+        this->shots.push_back(Sphere(0.0f, BOAT_WALL_Y_HEIGHT / 2.0f, - BOAT_LENGTH / 2.0f,
+            0.1f * (3 + rand() % 4), RAND_COLOR));
 }
 
 void Boat::set_position(float x, float y, float z = 0) {

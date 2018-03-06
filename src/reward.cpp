@@ -4,14 +4,19 @@
 
 #define REWARD_WIDTH 1.5
 #define ARROW_LENGTH 3.0f
+#define HEALTH 0
+#define AMMO 1
 
 Reward::Reward(float x, float z) {
     this->set_position(x, 0.0f, z);
     this->set_rotation(0.0f, 0.0f, 0.0f);
     this->set_dimension(3 * REWARD_WIDTH, ARROW_LENGTH * (1 + sin(M_PI / 4.0f)), REWARD_WIDTH);
 
+    this->type = (rand() % 2)? HEALTH : AMMO;
+
     // rendering the elements
-    color_t top_color = {255, 0, 242};
+    color_t health_color = {255, 0, 242}, ammo_color = {255, 0, 0},
+    top_color = (this->type == HEALTH)? health_color : ammo_color;
 
     // top arrow
     Prism top_prism = Prism(0.0f, 0.0f, 2.5f, ARROW_LENGTH, REWARD_WIDTH, top_color);
@@ -62,6 +67,8 @@ void Reward::set_dimension(float x, float y, float z) {
 }
 
 void Reward::tick() {
+    this->rotation.y++;
+    this->rotation.y = (int) this->rotation.y % 361;
     if(this->counter)
         this->counter--;
     else

@@ -7,6 +7,7 @@
 #define SEA_OFFSET 0.4f
 
 #define ENEMY_SPEED 0.02f
+#define GRAVITY 0.004f
 #define ROLL_RATE 0.1f
 
 Enemy::Enemy(float x, float y, float z, float width, color_t color) {
@@ -89,6 +90,16 @@ void Enemy::tick(float x, float z) {
 	// change the basic speed
 	this->position.x += (((this->position.x > x)? -1 : 1) * this->speed.x);
 	this->position.z += (((this->position.z > z)? -1 : 1) * this->speed.z);
+
+	this->position.y += this->speed.y;
+    if(this->position.y > 0)
+        this->speed.y -= GRAVITY;
+    else {
+        this->position.y = 0;
+        this->speed.y = 0;
+        this->is_jumping = false;
+    }
+
 
 	if(this->is_smart) {
 

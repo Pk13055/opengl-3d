@@ -5,6 +5,8 @@
 using namespace std;
 
 #define REWARD_TIME 180
+#define HEALTH 0
+#define AMMO 1
 
 #ifndef REWARD_H
 #define REWARD_H
@@ -18,7 +20,7 @@ public:
     color_t color = {0, 255, 233};
 
     vector<Prism> elements;
-    int counter = REWARD_TIME;
+    int counter = REWARD_TIME, type = HEALTH;
     bool is_visible = true;
 
     void draw(glm::mat4 VP);

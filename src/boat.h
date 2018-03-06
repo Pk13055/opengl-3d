@@ -26,6 +26,7 @@ public:
     void set_position(float x, float y, float z);
     void set_speed(float x_speed, float y_speed, float z_speed);
     void set_rotation(float x_rot, float y_rot, float z_rot);
+    void load_ammo(int count);
     void tick();
 
     bounding_box_t bounding_box();

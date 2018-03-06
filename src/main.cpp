@@ -10,6 +10,8 @@
 
 #define RAND_COLOR { rand() % 255, rand() % 255, rand() % 255 }
 #define LEVEL 2
+#define HEALTH 0
+#define AMMO 1
 
 #define Z_ACCLR 0.002f // speed increase
 #define X_ACCLR 0.002f // speed increase
@@ -30,17 +32,21 @@ vector<Prism> rocks;
 vector<Enemy> enemies;
 vector<Sphere> balls;
 vector<Reward> rewards;
-Boat boat;
+
+#define VIEWS 4
+#define CAMERA_FOLLOWER_VIEW 0
+#define CAMERA_TOP_VIEW 1
+#define CAMERA_CINEMA_VIEW 2
+#define FIRST_PERSON_VIEW 3
+vector<bool> views(VIEWS, false);
+int current_view = 0;
+
 Sea sea;
 Cube tower;
-
+Boat boat;
 int boat_health = 100, score = 0;
-int current_view = 0;
-// 0 -> camera_follower
-// 1 -> camera top view
-// 2 -> camera cinema view
-bool camera_follower_view = true, camera_top_view = false, camera_cinema_view = false,
-sphere_hold = false, boost_allow = false;
+
+bool sphere_hold = false, boost_allow = false, view_changed = false, has_jumped = false;
 float screen_zoom = 2.0, screen_center_x = 0, screen_center_y = 0, screen_center_z = 0;
 float eye_x,eye_y,eye_z;
 float target_x, target_y, target_z;
@@ -59,7 +65,7 @@ void draw() {
 
 
 	// All Camera Positions defined here.
-	if (camera_top_view == true) {
+	if (views[CAMERA_TOP_VIEW]) {
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
@@ -67,7 +73,7 @@ void draw() {
 		eye_y = target_y + CINEMA_HEIGHT / 2.0f;
 		eye_z = target_z + FOLLOW_DISTANCE * sin(camera_rotation_angle * M_PI / 180.0f);
 	}
-	else if (camera_follower_view == true){
+	else if (views[CAMERA_FOLLOWER_VIEW]){
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
@@ -76,13 +82,21 @@ void draw() {
 		eye_y = target_y + FOLLOW_DISTANCE;
 		eye_z = target_z + FOLLOW_DISTANCE * sin(camera_rotation_angle * M_PI / 180.0f);
 	}
-	else if (camera_cinema_view == true) {
+	else if (views[CAMERA_CINEMA_VIEW]) {
 		target_x = boat.position.x;
 		target_y = boat.position.y;
 		target_z = boat.position.z;
 		eye_x = TOWER_X;
 		eye_y = CINEMA_HEIGHT;
 		eye_z = TOWER_Z;
+	}
+	else if(views[FIRST_PERSON_VIEW]) {
+		target_x = boat.position.x - FOLLOW_DISTANCE * sin(boat.rotation.y * M_PI / 180.0f);
+        target_y = boat.position.y + FOLLOW_DISTANCE / 2.0f;
+		target_z = boat.position.z - FOLLOW_DISTANCE * cos(boat.rotation.y * M_PI / 180.0f);
+		eye_x = boat.position.x;
+		eye_y = boat.position.y + FOLLOW_DISTANCE;
+		eye_z = boat.position.z;
 	}
 
 
@@ -164,23 +178,32 @@ void tick_input(GLFWwindow *window) {
 	if(a) 		boat.rotation.y += Y_PAN;
 	else if(d) 	boat.rotation.y -= Y_PAN;
 
-	if(v) {
+	if(v && view_changed == false) {
+		view_changed = true;
 		current_view++;
-		current_view = current_view % 3;
+		current_view = current_view % VIEWS;
 		tower.visible = true;
-		camera_follower_view = camera_top_view = camera_cinema_view = false;
+		for(int i = 0; i < VIEWS; views[i++] = false);
 		switch(current_view) {
-			case 0: 	camera_follower_view	= true;
-						break;
-			case 1: 	camera_top_view 		= true;
-						break;
-			case 2: 	camera_cinema_view 		= true;
-						tower.visible = false;
-						break;
-			default: 	camera_follower_view 	= true;
-						break;
+			case CAMERA_FOLLOWER_VIEW:
+				views[CAMERA_FOLLOWER_VIEW]	= true;
+				break;
+			case CAMERA_TOP_VIEW:
+				views[CAMERA_TOP_VIEW] 		= true;
+				break;
+			case CAMERA_CINEMA_VIEW:
+				views[CAMERA_CINEMA_VIEW]	= true;
+				tower.visible = false;
+				break;
+			case FIRST_PERSON_VIEW:
+				views[FIRST_PERSON_VIEW]	= true;
+				break;
+			default:
+				views[CAMERA_FOLLOWER_VIEW]	= true;
+				break;
 		}
 	}
+	else view_changed = false;
 
 	if(f && sphere_hold == false) {
 		sphere_hold = true;
@@ -195,22 +218,17 @@ void tick_input(GLFWwindow *window) {
 			balls.push_back(fired_ball);
 		}
 	}
+	else  sphere_hold = false;
 
-	if(space && boat.is_jumping == false) boat.is_jumping = true, boat.speed.y = 0.2f;
+	if(space && has_jumped == false) {
+		has_jumped = true;
+		boat.is_jumping == true;
+		boat.speed.y = 0.2f;
+	}
+	else has_jumped = false;
 }
 
-bool tick_elements() {
-
-	sea.tick();
-	boat.tick();
-	for(vector<Sphere>::iterator cur_ball = balls.begin(); cur_ball != balls.end();)
-		if(cur_ball->tick())
-			cur_ball = balls.erase(cur_ball);
-		else cur_ball++;
-	for(auto reward: rewards) reward.tick();
-	for(auto &enemy: enemies) enemy.tick(boat.position.x, boat.position.z);
-	sea.set_position(boat.position.x, boat.position.z);
-
+bool check_status() {
 	char mesg_display[512], final_mesg[128];
     if(boat.life == 0 || enemies.size() == 0) {
         sprintf(final_mesg, (!boat.life)? "Game Over!" : "Winner!");
@@ -223,10 +241,33 @@ bool tick_elements() {
     else {
         sprintf(final_mesg, "%d enemies left", (int) enemies.size());
         sprintf(mesg_display, "3D LoZ v3.4 Status %s | life: %d | Score: %d | Balls : %d",
-         final_mesg, boat.life, boat.score, (int) boat.shots.size());
+         final_mesg, boat.life, boat.score, boat.shots.size());
         glfwSetWindowTitle(window, mesg_display);
         return false;
     }
+}
+
+void tick_elements() {
+
+	sea.tick();
+	boat.tick();
+	for(vector<Sphere>::iterator cur_ball = balls.begin(); cur_ball != balls.end();)
+		if(cur_ball->tick())
+			cur_ball = balls.erase(cur_ball);
+		else cur_ball++;
+	for(auto &reward: rewards) reward.tick();
+	for(auto &enemy: enemies) {
+		if(rand() % (11 - LEVEL) == 1 && enemy.is_jumping == false &&
+			fabs(enemy.position.x - boat.position.x) > 10.0f &&
+			fabs(enemy.position.z - boat.position.z) > 10.0f) {
+			enemy.is_jumping = true;
+			enemy.speed.y = (enemy.is_smart)? 0.4f : 0.2f;
+		}
+		enemy.tick(boat.position.x, boat.position.z);
+	}
+	sea.set_position(boat.position.x, boat.position.z);
+	cout<<"B : "<<boat.life<<" "<<boat.shots.size()<<endl;
+
 }
 
 
@@ -242,7 +283,10 @@ void collision_function(){
 		if(detect_collision(boat.bounding_box(), reward->bounding_box())) {
 			cout<<"BOAT <-> REWARD"<<endl;
 			boost_allow = true;
-			boat.life += 10;
+			if(reward->type == HEALTH)
+				boat.life += 10;
+			else if(reward->type == AMMO)
+				boat.load_ammo(rand() % 4);
 			boat.score += 50;
 			reward = rewards.erase(reward);
 			continue;
@@ -382,7 +426,6 @@ void collision_function(){
 void initGL(GLFWwindow *window, int width, int height) {
 
 	/* Objects should be created before any other gl function and shaders */
-
 	// Create the models
 
 	boat    	= Boat(0.0f, 0.0f, COLOR_ORANGE);
@@ -464,27 +507,32 @@ int main(int argc, char **argv) {
 			glfwSwapBuffers(window);
 
 			// All elements update
-			bool status = tick_elements();
+			tick_elements();
 
 			// Collision Engine
 			collision_function();
 
-			if(status) break;
 
 			if(timer % 61 == 0) sphere_hold = false, boat.draw_shot = true;
 			else if(timer % 183 == 0) {
 				boost_allow = true;
+				boat.load_ammo(rand() % 3);
 				rewards.push_back(Reward(
 					((rand() % 2 )? -1 : 1) * rand() % 200,
 					((rand() % 2 )? -1 : 1) * rand() % 200
 				));
 			}
 
+			bool status = check_status();
+
+			if(status) break;
+
 			// Take input from user
 			tick_input(window);
 
 			reshapeWindow (window, width, height);
-			(++timer) %= 1893;
+			++timer;
+			timer %= 1893;
 
 		}
 
